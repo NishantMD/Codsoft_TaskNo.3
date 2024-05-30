@@ -1,0 +1,53 @@
+import pandas as pd
+import numpy as np
+from sklearn.metrics.pairwise import cosine_similarity
+from google.colab import files
+
+# Upload files manually
+uploaded = files.upload()
+
+# List the files to make sure they are uploaded
+!ls
+
+# Load the datasets
+movies = pd.read_csv('movies.csv')
+ratings = pd.read_csv('ratings.csv')
+
+# Combine movies and ratings data
+data = pd.merge(ratings, movies, on='movieId')
+
+# Create a matrix with users as rows and movies as columns
+user_item_matrix = data.pivot_table(index='userId', columns='title', values='rating').fillna(0)
+
+# Calculate similarity between users
+user_similarity = cosine_similarity(user_item_matrix)
+user_similarity_df = pd.DataFrame(user_similarity, index=user_item_matrix.index, columns=user_item_matrix.index)
+
+# Function to recommend movies
+def get_recommendations(user_id, num_recommendations=5):
+    # Similarity scores for the user
+    similarity_scores = user_similarity_df[user_id]
+    
+    # User's movie ratings
+    user_ratings = user_item_matrix.loc[user_id]
+    
+    # Calculate scores for all movies
+    weighted_ratings = np.dot(user_similarity[user_id], user_item_matrix)
+    
+    # Put the scores in a DataFrame
+    weighted_ratings_df = pd.DataFrame(weighted_ratings, index=user_item_matrix.columns, columns=['weighted_rating'])
+    
+    # Exclude movies the user has already rated
+    already_rated = user_ratings[user_ratings > 0].index
+    recommendations = weighted_ratings_df[~weighted_ratings_df.index.isin(already_rated)]
+    
+    # Sort by score and get top recommendations
+    top_recommendations = recommendations.sort_values('weighted_rating', ascending=False).head(num_recommendations)
+    
+    return top_recommendations
+
+# You can choose whichever id u want to get the recommendation for
+user_id = 1  # Specify the user ID
+recommendations = get_recommendations(user_id)
+print(f"Top recommendations for user {user_id}:")
+print(recommendations)
